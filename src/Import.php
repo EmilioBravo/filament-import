@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Validator;
 use Konnco\FilamentImport\Actions\ImportField;
 use Konnco\FilamentImport\Concerns\HasActionMutation;
 use Konnco\FilamentImport\Concerns\HasActionUniqueField;
+use Konnco\FilamentImport\Concerns\HasTemporaryDisk;
 use Maatwebsite\Excel\Concerns\Importable;
 
 class Import
@@ -21,6 +22,7 @@ class Import
     use Importable;
     use HasActionMutation;
     use HasActionUniqueField;
+    use HasTemporaryDisk;
 
     protected string $spreadsheet;
 
@@ -104,13 +106,10 @@ class Import
 
     public function getSpreadsheetData(): Collection
     {
-        $driver = config("filesystems.disks.{$this->disk}.driver");
-        $isRemote = in_array($driver, ['s3', 'ftp', 'sftp']);
-
-        $data = $this->toCollection($isRemote ? $this->spreadsheet : new UploadedFile(Storage::disk($this->disk)->path($this->spreadsheet), $this->spreadsheet))
+        $data = $this->toCollection($this->temporaryDiskIsRemote() ? $this->spreadsheet : new UploadedFile(Storage::disk($this->disk)->path($this->spreadsheet), $this->spreadsheet))
             ->first()
             ->skip((int) $this->shouldSkipHeader);
-        if (! $this->shouldHandleBlankRows) {
+        if (!$this->shouldHandleBlankRows) {
             return $data;
         }
 
@@ -164,7 +163,7 @@ class Import
 
                     if ($field instanceof ImportField) {
                         // check if field is optional
-                        if (! $field->isRequired() && blank(@$row[$value])) {
+                        if (!$field->isRequired() && blank(@$row[$value])) {
                             continue;
                         }
 
@@ -180,7 +179,7 @@ class Import
 
                 $prepareInsert = $this->validated(data: Arr::undot($prepareInsert), rules: $rules, customMessages: $validationMessages, line: $line + 1);
 
-                if (! $prepareInsert) {
+                if (!$prepareInsert) {
                     DB::rollBack();
                     $importSuccess = false;
 
@@ -205,8 +204,8 @@ class Import
                     }
                 }
 
-                if (! $this->handleRecordCreation) {
-                    if (! $this->shouldMassCreate) {
+                if (!$this->handleRecordCreation) {
+                    if (!$this->shouldMassCreate) {
                         $model = (new $this->model)->fill($prepareInsert);
                         $model = tap($model, function ($instance) {
                             $instance->save();
@@ -232,7 +231,7 @@ class Import
                 ->send();
         }
 
-        if (! $importSuccess) {
+        if (!$importSuccess) {
             Notification::make()
                 ->danger()
                 ->title(trans('filament-import::actions.import_failed_title'))

@@ -12,7 +12,6 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
-use Illuminate\Support\Facades\App;
 use Konnco\FilamentImport\Concerns\HasActionMutation;
 use Konnco\FilamentImport\Concerns\HasActionUniqueField;
 use Konnco\FilamentImport\Concerns\HasTemporaryDisk;
@@ -131,7 +130,7 @@ class ImportAction extends Action
         return [
             FileUpload::make('file')
                 ->label('')
-                ->required(! app()->environment('testing'))
+                ->required(!app()->environment('testing'))
                 ->acceptedFileTypes(config('filament-import.accepted_mimes'))
                 ->imagePreviewHeight('250')
                 ->reactive()
@@ -165,14 +164,14 @@ class ImportAction extends Action
                 $options = $this->cachedHeadingOptions;
 
                 if (count($options) === 0) {
-                    $options = $this->toCollection($filePath, ! App::runningUnitTests() ? $this->getTemporaryDisk() : null)->first()?->first()->filter(fn ($value) => $value != null)->map('trim')->toArray();
+                    $options = $this->toCollection($filePath, $this->temporaryDiskIsRemote() ? $this->getTemporaryDisk() : null)->first()?->first()->filter(fn ($value) => $value != null)->map('trim')->toArray();
                 }
 
                 $selected = array_search($field->getName(), $options);
 
                 if ($selected !== false) {
                     $set($field->getName(), $selected);
-                } elseif (! empty($field->getAlternativeColumnNames())) {
+                } elseif (!empty($field->getAlternativeColumnNames())) {
                     $alternativeNames = array_intersect($field->getAlternativeColumnNames(), $options);
                     if (count($alternativeNames) > 0) {
                         $set($field->getName(), array_search(current($alternativeNames), $options));
